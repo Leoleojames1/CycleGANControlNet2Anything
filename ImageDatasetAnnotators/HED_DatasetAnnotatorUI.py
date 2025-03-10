@@ -14,9 +14,43 @@ from tkinter import filedialog
 import base64
 import io
 
-# Import the model from the provided run.py
-sys.path.append(".")
-from run import Network, estimate
+# Import the model using environment variable
+# Import the model using command-line argument or environment variable or default path
+import argparse
+
+# Set up argument parser
+parser = argparse.ArgumentParser(description='HED Edge Detection Dataset Annotator')
+parser.add_argument('--hed_path', type=str, default=None, help='Path to HED model directory')
+args, unknown = parser.parse_known_args()
+
+# Determine HED path in this order: command-line arg, environment variable, default paths
+hed_path = args.hed_path
+if hed_path is None:
+    hed_path = os.getenv('HED_PATH')
+if hed_path is None:
+    # Try some default paths
+    possible_paths = [
+        '.',  # Current directory
+        'M:\\PHOTO_HDD_AUTUMN_GAN\\pytorch-hed',  # Your specific path
+        os.path.join(os.path.dirname(__file__), '..', 'pytorch-hed'),  # One level up
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'pytorch-hed')  # Absolute path
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            hed_path = path
+            print(f"Using default HED path: {hed_path}")
+            break
+
+if hed_path is None or not os.path.exists(hed_path):
+    raise ValueError(f"HED model path not found. Please provide a valid path using --hed_path argument or HED_PATH environment variable.")
+
+sys.path.append(hed_path)
+
+try:
+    from run import Network, estimate
+    print(f"Successfully imported HED model from {hed_path}")
+except ImportError as e:
+    raise ImportError(f"Could not import HED model from {hed_path}: {e}")
 
 # Global variables
 processed_images = []
@@ -149,6 +183,10 @@ def process_image(input_path):
         img_np = np.array(img_resized)[:, :, ::-1].transpose(2, 0, 1).astype(np.float32) * (1.0 / 255.0)
         ten_input = torch.FloatTensor(np.ascontiguousarray(img_np))
         
+        # Move to GPU if available
+        if torch.cuda.is_available():
+            ten_input = ten_input.cuda()
+        
         # Process with the model
         ten_output = estimate(ten_input)
         
@@ -263,7 +301,10 @@ def view_more_images():
 
 # Initialize the model
 print("Initializing HED model...")
-model = Network().cuda().train(False)
+model = Network()
+if torch.cuda.is_available():
+    model = model.cuda()
+model.train(False)
 print("Model loaded!")
 
 # Create Gradio interface
@@ -282,6 +323,19 @@ with gr.Blocks(title="HED Edge Detection - Construction Zone", css=custom_css) a
             # Container for controls
             gr.HTML('<div class="container-box">')
             gr.HTML("<h3>🔧 CONTROL PANEL 🔧</h3>")
+            
+            # Environment Variable Info
+            gr.HTML("""
+            <div class="info-box">
+                <h4>🔧 ENVIRONMENT SETUP</h4>
+                <p>This application requires the following environment variable:</p>
+                <ul>
+                    <li><b>HED_PATH:</b> Path to the HED model directory</li>
+                </ul>
+                <p>Example: <code>export HED_PATH=/path/to/hed</code></p>
+                <p>Current HED_PATH: <code>""" + hed_path + """</code></p>
+            </div>
+            """)
             
             # Caution divider
             gr.HTML('<div class="caution-divider"></div>')
@@ -412,9 +466,14 @@ with gr.Blocks(title="HED Edge Detection - Construction Zone", css=custom_css) a
     )
 
 if __name__ == "__main__":
+    # Print environment variable information
+    print(f"HED_PATH: {hed_path}")
+    
     # Make sure cuda is available
     if not torch.cuda.is_available():
         print("⚠️ WARNING: CUDA is not available. The model will run on CPU and be EXTREMELY slow.")
+    else:
+        print("CUDA is available. Using GPU for processing.")
     
     # Launch the app
     app.launch(share=False)
