@@ -1,2 +1,2 @@
 # CycleGANControlNet2Anything
-This project provides a training notebook, dataset annotator, and inference ui for training cycleGAN img2img utilizing the Depth-Anything-V2 and HED models as a control net for dataset annotation, as well as additional data annotation techniques such as original image blending within the depth or HED map.
+This project provides a training notebook, dataset annotators, and inference ui's for training img2img cycleGAN's utilizing my style preservation data annotation technique developed around annotating images with Depth-Anything-V2 and HED (Holistically-Nested Edge Detection) models.
